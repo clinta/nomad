@@ -1158,6 +1158,14 @@ func (s *StateStore) AllocsByJob(ws memdb.WatchSet, jobID string, all bool) ([]*
 		}
 
 		alloc := raw.(*structs.Allocation)
+		if alloc.Job == nil {
+			s.logger.Printf("[ERR] state_store: allocation exists without job: %v", alloc.ID)
+			// If we're returning all jobs, we can keep this alloc
+			if !all {
+				continue
+			}
+		}
+
 		// If the allocation belongs to a job with the same ID but a different
 		// create index and we are not getting all the allocations whose Jobs
 		// matches the same Job ID then we skip it
