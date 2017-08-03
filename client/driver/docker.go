@@ -135,6 +135,38 @@ type DockerLoggingOpts struct {
 	Config    map[string]string   `mapstructure:"-"`
 }
 
+type Mount struct {
+	Target        string         `mapstructure:"target"`
+	Source        string         `mapstructure:"source"`
+	Type          string         `mapstructure:"type"`
+	ReadOnly      bool           `mapstructure:"readonly"`
+	BindOptions   *BindOptions   `mapstructure:"bind_options"`
+	VolumeOptions *VolumeOptions `mapstructure:"volume_options"`
+	TempfsOptions *TempfsOptions `mapstructure:"tempfs_options"`
+}
+
+type BindOptions struct {
+	Propegation string `mapstructure:"propegation"`
+}
+
+type VolumeOptions struct {
+	NoCopy       bool               `mapstructure:"no_copy"`
+	Labels       map[string]string  `mapstructure:"labels"`
+	DriverConfig VolumeDriverConfig `mapstructure:"volume_driver_config"`
+}
+
+// TempfsOptions contains optional configuration for the tempfs type
+type TempfsOptions struct {
+	SizeBytes int64 `mapstructure:"size_bytes"`
+	Mode      int   `mapstructure:"mode"`
+}
+
+// VolumeDriverConfig holds a map of volume driver specific options
+type VolumeDriverConfig struct {
+	Name    string            `mapstructure:"name"`
+	Options map[string]string `mapstructure:"options"`
+}
+
 type DockerDriverConfig struct {
 	ImageName        string              `mapstructure:"image"`              // Container's Image Name
 	LoadImage        string              `mapstructure:"load"`               // LoadImage is a path to an image archive file
@@ -165,6 +197,7 @@ type DockerDriverConfig struct {
 	WorkDir          string              `mapstructure:"work_dir"`           // Working directory inside the container
 	Logging          []DockerLoggingOpts `mapstructure:"logging"`            // Logging options for syslog server
 	Volumes          []string            `mapstructure:"volumes"`            // Host-Volumes to mount in, syntax: /path/to/host/directory:/destination/path/in/container
+	Mounts           []Mount             `mapstructure:"mounts"`             // Docker volumes to mount
 	VolumeDriver     string              `mapstructure:"volume_driver"`      // Docker volume driver used for the container's volumes
 	ForcePull        bool                `mapstructure:"force_pull"`         // Always force pull before running image, useful if your tags are mutable
 	MacAddress       string              `mapstructure:"mac_address"`        // Pin mac address to container
@@ -230,6 +263,34 @@ func NewDockerDriverConfig(task *structs.Task, env *env.TaskEnv) (*DockerDriverC
 			for k, v := range c {
 				delete(c, k)
 				c[env.ReplaceEnv(k)] = env.ReplaceEnv(v)
+			}
+		}
+	}
+
+	for i, m := range dconf.Mounts {
+		dconf.Mounts[i].Target = env.ReplaceEnv(m.Target)
+		dconf.Mounts[i].Source = env.ReplaceEnv(m.Source)
+		dconf.Mounts[i].Type = env.ReplaceEnv(m.Type)
+		if m.BindOptions != nil {
+			dconf.Mounts[i].BindOptions.Propegation = env.ReplaceEnv(m.BindOptions.Propegation)
+		}
+		if m.VolumeOptions != nil {
+			if m.VolumeOptions.Labels != nil {
+				for k, v := range m.VolumeOptions.Labels {
+					if k != env.ReplaceEnv(k) {
+						delete(dconf.Mounts[i].VolumeOptions.Labels, k)
+					}
+					dconf.Mounts[i].VolumeOptions.Labels[env.ReplaceEnv(k)] = env.ReplaceEnv(v)
+				}
+			}
+			dconf.Mounts[i].VolumeOptions.DriverConfig.Name = env.ReplaceEnv(m.VolumeOptions.DriverConfig.Name)
+			if m.VolumeOptions.DriverConfig.Options != nil {
+				for k, v := range m.VolumeOptions.DriverConfig.Options {
+					if k != env.ReplaceEnv(k) {
+						delete(dconf.Mounts[i].VolumeOptions.DriverConfig.Options, k)
+					}
+					dconf.Mounts[i].VolumeOptions.DriverConfig.Options[env.ReplaceEnv(k)] = env.ReplaceEnv(v)
+				}
 			}
 		}
 	}
@@ -360,102 +421,105 @@ func (d *DockerDriver) Validate(config map[string]interface{}) error {
 	fd := &fields.FieldData{
 		Raw: config,
 		Schema: map[string]*fields.FieldSchema{
-			"image": &fields.FieldSchema{
+			"image": {
 				Type:     fields.TypeString,
 				Required: true,
 			},
-			"load": &fields.FieldSchema{
+			"load": {
 				Type: fields.TypeString,
 			},
-			"command": &fields.FieldSchema{
+			"command": {
 				Type: fields.TypeString,
 			},
-			"args": &fields.FieldSchema{
+			"args": {
 				Type: fields.TypeArray,
 			},
-			"ipc_mode": &fields.FieldSchema{
+			"ipc_mode": {
 				Type: fields.TypeString,
 			},
-			"network_mode": &fields.FieldSchema{
+			"network_mode": {
 				Type: fields.TypeString,
 			},
-			"network_aliases": &fields.FieldSchema{
+			"network_aliases": {
 				Type: fields.TypeArray,
 			},
-			"ipv4_address": &fields.FieldSchema{
+			"ipv4_address": {
 				Type: fields.TypeString,
 			},
-			"ipv6_address": &fields.FieldSchema{
+			"ipv6_address": {
 				Type: fields.TypeString,
 			},
-			"mac_address": &fields.FieldSchema{
+			"mac_address": {
 				Type: fields.TypeString,
 			},
-			"pid_mode": &fields.FieldSchema{
+			"pid_mode": {
 				Type: fields.TypeString,
 			},
-			"uts_mode": &fields.FieldSchema{
+			"uts_mode": {
 				Type: fields.TypeString,
 			},
-			"userns_mode": &fields.FieldSchema{
+			"userns_mode": {
 				Type: fields.TypeString,
 			},
-			"port_map": &fields.FieldSchema{
+			"port_map": {
 				Type: fields.TypeArray,
 			},
-			"privileged": &fields.FieldSchema{
+			"privileged": {
 				Type: fields.TypeBool,
 			},
-			"dns_servers": &fields.FieldSchema{
+			"dns_servers": {
 				Type: fields.TypeArray,
 			},
-			"dns_search_domains": &fields.FieldSchema{
+			"dns_search_domains": {
 				Type: fields.TypeArray,
 			},
-			"extra_hosts": &fields.FieldSchema{
+			"extra_hosts": {
 				Type: fields.TypeArray,
 			},
-			"hostname": &fields.FieldSchema{
+			"hostname": {
 				Type: fields.TypeString,
 			},
-			"labels": &fields.FieldSchema{
+			"labels": {
 				Type: fields.TypeArray,
 			},
-			"auth": &fields.FieldSchema{
+			"auth": {
 				Type: fields.TypeArray,
 			},
-			"auth_soft_fail": &fields.FieldSchema{
+			"auth_soft_fail": {
 				Type: fields.TypeBool,
 			},
 			// COMPAT: Remove in 0.6.0. SSL is no longer needed
-			"ssl": &fields.FieldSchema{
+			"ssl": {
 				Type: fields.TypeBool,
 			},
-			"tty": &fields.FieldSchema{
+			"tty": {
 				Type: fields.TypeBool,
 			},
-			"interactive": &fields.FieldSchema{
+			"interactive": {
 				Type: fields.TypeBool,
 			},
-			"shm_size": &fields.FieldSchema{
+			"shm_size": {
 				Type: fields.TypeInt,
 			},
-			"work_dir": &fields.FieldSchema{
+			"work_dir": {
 				Type: fields.TypeString,
 			},
-			"logging": &fields.FieldSchema{
+			"logging": {
 				Type: fields.TypeArray,
 			},
-			"volumes": &fields.FieldSchema{
+			"volumes": {
 				Type: fields.TypeArray,
 			},
-			"volume_driver": &fields.FieldSchema{
+			"volume_driver": {
 				Type: fields.TypeString,
 			},
-			"force_pull": &fields.FieldSchema{
+			"mounts": {
+				Type: fields.TypeArray,
+			},
+			"force_pull": {
 				Type: fields.TypeBool,
 			},
-			"security_opt": &fields.FieldSchema{
+			"security_opt": {
 				Type: fields.TypeArray,
 			},
 		},
@@ -935,6 +999,38 @@ func (d *DockerDriver) createContainerConfig(ctx *ExecContext, task *structs.Tas
 		}
 	}
 
+	// Setup mounts
+	for _, m := range driverConfig.Mounts {
+		hm := docker.HostMount{
+			Target:   m.Target,
+			Source:   m.Source,
+			Type:     m.Type,
+			ReadOnly: m.ReadOnly,
+		}
+		if m.BindOptions != nil {
+			hm.BindOptions = &docker.BindOptions{
+				Propegation: m.BindOptions.Propegation,
+			}
+		}
+		if m.VolumeOptions != nil {
+			hm.VolumeOptions = &docker.VolumeOptions{
+				NoCopy: m.VolumeOptions.NoCopy,
+				Labels: m.VolumeOptions.Labels,
+				DriverConfig: docker.VolumeDriverConfig{
+					Name:    m.VolumeOptions.DriverConfig.Name,
+					Options: m.VolumeOptions.DriverConfig.Options,
+				},
+			}
+		}
+		if m.TempfsOptions != nil {
+			hm.TempfsOptions = &docker.TempfsOptions{
+				SizeBytes: m.TempfsOptions.SizeBytes,
+				Mode:      m.TempfsOptions.Mode,
+			}
+		}
+		hostConfig.Mounts = append(hostConfig.Mounts, hm)
+	}
+
 	// set DNS search domains and extra hosts
 	hostConfig.DNSSearch = driverConfig.DNSSearchDomains
 	hostConfig.ExtraHosts = driverConfig.ExtraHosts
@@ -1043,7 +1139,7 @@ func (d *DockerDriver) createContainerConfig(ctx *ExecContext, task *structs.Tas
 	if len(driverConfig.NetworkAliases) > 0 || driverConfig.IPv4Address != "" || driverConfig.IPv6Address != "" {
 		networkingConfig = &docker.NetworkingConfig{
 			EndpointsConfig: map[string]*docker.EndpointConfig{
-				hostConfig.NetworkMode: &docker.EndpointConfig{},
+				hostConfig.NetworkMode: {},
 			},
 		}
 	}
@@ -1302,7 +1398,7 @@ func (d *DockerDriver) Open(ctx *ExecContext, handleID string) (DriverHandle, er
 	// Look for a running container with this ID
 	containers, err := client.ListContainers(docker.ListContainersOptions{
 		Filters: map[string][]string{
-			"id": []string{pid.ContainerID},
+			"id": {pid.ContainerID},
 		},
 	})
 	if err != nil {
