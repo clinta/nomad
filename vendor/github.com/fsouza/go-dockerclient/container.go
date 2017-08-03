@@ -327,6 +327,43 @@ type Config struct {
 	VolumesFrom string `json:"VolumesFrom,omitempty" yaml:"VolumesFrom,omitempty" toml:"VolumesFrom,omitempty"`
 }
 
+// HostMount represents a mount point in the container in HostConfig.
+//
+// It has been added in the version 1.25 of the Docker API
+type HostMount struct {
+	Target        string         `json:"Target,omitempty" yaml:"Target,omitempty" toml:"Target,omitempty"`
+	Source        string         `json:"Source,omitempty" yaml:"Source,omitempty" toml:"Source,omitempty"`
+	Type          string         `json:"Type,omitempty" yaml:"Type,omitempty" toml:"Type,omitempty"`
+	ReadOnly      bool           `json:"Readonly,omitempty" yaml:"Readonly,omitempty" toml:"Readonly,omitempty"`
+	BindOptions   *BindOptions   `json:"BindOptions,omitempty" yaml:"BindOptions,omitempty" toml:"BindOptions,omitempty"`
+	VolumeOptions *VolumeOptions `json:"VolumeOptions,omitempty" yaml:"VolumeOptions,omitempty" toml:"VolumeOptions,omitempty"`
+	TempfsOptions *TempfsOptions `json:"TempfsOptions,omitempty" yaml:"TempfsOptions,omitempty" toml:"TempfsOptions,omitempty"`
+}
+
+// BindOptions contains optional configuration for the bind type
+type BindOptions struct {
+	Propegation string `json:"Propegation,omitempty" yaml:"Propegation,omitempty" toml:"Propegation,omitempty"`
+}
+
+// VolumeOptions contains optional configuration for the volume type
+type VolumeOptions struct {
+	NoCopy       bool               `json:"NoCopy,omitempty" yaml:"NoCopy,omitempty" toml:"NoCopy,omitempty"`
+	Labels       map[string]string  `json:"Labels,omitempty" yaml:"Labels,omitempty" toml:"Labels,omitempty"`
+	DriverConfig VolumeDriverConfig `json:"VolumeDriverConfig,omitempty" yaml:"VolumeDriverConfig,omitempty" toml:"VolumeDriverConfig,omitempty"`
+}
+
+// TempfsOptions contains optional configuration for the tempfs type
+type TempfsOptions struct {
+	SizeBytes int64 `json:"SizeBytes,omitempty" yaml:"SizeBytes,omitempty" toml:"SizeBytes,omitempty"`
+	Mode      int   `json:"Mode,omitempty" yaml:"Mode,omitempty" toml:"Mode,omitempty"`
+}
+
+// VolumeDriverConfig holds a map of volume driver specific options
+type VolumeDriverConfig struct {
+	Name    string            `json:"Name,omitempty" yaml:"Name,omitempty" toml:"Name,omitempty"`
+	Options map[string]string `json:"Options,omitempty" yaml:"Options,omitempty" toml:"Options,omitempty"`
+}
+
 // Mount represents a mount point in the container.
 //
 // It has been added in the version 1.20 of the Docker API, available since
@@ -735,6 +772,7 @@ type HostConfig struct {
 	AutoRemove           bool                   `json:"AutoRemove,omitempty" yaml:"AutoRemove,omitempty" toml:"AutoRemove,omitempty"`
 	StorageOpt           map[string]string      `json:"StorageOpt,omitempty" yaml:"StorageOpt,omitempty" toml:"StorageOpt,omitempty"`
 	Sysctls              map[string]string      `json:"Sysctls,omitempty" yaml:"Sysctls,omitempty" toml:"Sysctls,omitempty"`
+	Mounts               []HostMount            `json:"Mounts,omitempty" yaml:"Mounts,omitempty" toml:"Mounts,omitempty"`
 }
 
 // NetworkingConfig represents the container's networking configuration for each of its interfaces
