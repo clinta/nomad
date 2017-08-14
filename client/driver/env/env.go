@@ -53,6 +53,9 @@ const (
 	// AllocIndex is the environment variable for passing the allocation index.
 	AllocIndex = "NOMAD_ALLOC_INDEX"
 
+	// AllocIndex is the environment variable for passing the allocation index.
+	AllocIndex1 = "NOMAD_ALLOC_INDEX1"
+
 	// Datacenter is the environment variable for passing the datacenter in which the alloc is running.
 	Datacenter = "NOMAD_DC"
 
@@ -286,6 +289,7 @@ func (b *Builder) Build() *TaskEnv {
 	}
 	if b.allocIndex != -1 {
 		envMap[AllocIndex] = strconv.Itoa(b.allocIndex)
+		envMap[AllocIndex1] = strconv.Itoa(b.allocIndex + 1)
 	}
 	if b.taskName != "" {
 		envMap[TaskName] = b.taskName
